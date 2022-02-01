@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
@@ -34,7 +35,26 @@ fn handle_connection(mut stream: TcpStream) {
             return;
         }
     }
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
+
+    let get = b"GET / HTTP/1.1\r\n";
+
+    let (file_name, status_line) = 
+        if buf.starts_with(get) {
+            ("index.html", "404 NOT FOUND")
+        } else {
+            ("404.html", "200 OK")
+        };
+
+    let page = match fs::read_to_string(file_name) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    let response = format!("HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
+        status_line,
+        page.len(),
+        page
+    );
     if let Err(e) = stream.write(response.as_bytes()) {
             println!("Could not write to the stream");
             return;
