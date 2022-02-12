@@ -2,6 +2,11 @@ use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+use std::thread;
+use std::time::Duration;
+
+use web_server::pool;
+use web_server::pool::ThreadPool;
 
 fn main() {
     let listener = match
@@ -12,6 +17,8 @@ fn main() {
                 return;
             }
     };
+    let pool = ThreadPool::new(4);
+
     for stream in listener.incoming() {
         let stream = match stream {
             Ok(s) => s,
@@ -21,9 +28,10 @@ fn main() {
             }
         };
 
-        handle_connection(stream);    
+        pool.execute(|| {
+            handle_connection(stream);  
+        });  
     }
-
 }
 
 fn handle_connection(mut stream: TcpStream) {
@@ -37,10 +45,14 @@ fn handle_connection(mut stream: TcpStream) {
     }
 
     let get = b"GET / HTTP/1.1\r\n";
+    let sleep = b"GET /sleep HTTP/1.1\r\n";
 
     let (file_name, status_line) = 
         if buf.starts_with(get) {
             ("index.html", "404 NOT FOUND")
+        } else if buf.starts_with(sleep) {
+            thread::sleep(Duration::from_secs(5));
+            ("index.html", "HTTP/1.1 200 OK")
         } else {
             ("404.html", "200 OK")
         };
